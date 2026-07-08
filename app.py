@@ -14,7 +14,7 @@ from reportlab.lib.units import mm
 st.set_page_config(page_title="モザイクアート自動設計システム", layout="wide")
 
 st.title("🎨 モザイクアート自動設計システム")
-st.write("画像をアップロードするだけで、みんなで分担して色塗りできるA4サイズの設計図（PDF）を自動生成します。")
+st.write("画像をアップロードするだけで、みんなで分担して色塗りできる設計図（PDF）を自動生成します。")
 
 # ==========================================
 # 1. 基本設定（サイドバー）
@@ -74,7 +74,7 @@ SELECTED_PALETTE = palette_options[palette_choice]
 # 2. 事前ガイド（推奨サイズ計算）
 # ==========================================
 st.subheader("💡 ステップ1：代表的な画像比率と最適な用紙枚数")
-st.info(f"目標枚数（{target_area} 枚）を上回りつつ、**上限約15%の範囲内で最も形が美しくなる設定**を計算しました。\n\n※以下の予想サイズは、**周囲の余白をカットし、色塗り部分のみを連結させた「真の完成サイズ」**です。")
+st.info(f"目標枚数（{target_area} 枚）を上回りつつ、上限約15%の範囲内で最も形が美しくなる設定を計算しました。\n\n※以下の予想サイズは、**周囲の余白をカットし、色塗り部分のみを連結させた「真の完成サイズ」**です。")
 
 ratios = {
     "16:9 (動画・スマホ横)": 16/9,
@@ -83,14 +83,29 @@ ratios = {
     " 1:1 (正方形など)": 1/1
 }
 
-# 色塗り部分のみの物理寸法
+# 印刷用紙ごとの「色塗り部分のみ」の厳密な物理寸法（単位: メートル）
+# A4: 幅は左右15mmずつカット(-30mm)、高さは上下15mmずつ＋ヘッダー15mmカット(-45mm)
 PAINTED_W_A4 = 0.267
 PAINTED_H_A4 = 0.165
-PAINTED_W_A3, PAINTED_H_A3 = PAINTED_W_A4 * (420/297), PAINTED_H_A4 * (297/210)
-PAINTED_W_B5, PAINTED_H_B5 = PAINTED_W_A4 * (257/297), PAINTED_H_A4 * (182/210)
-PAINTED_W_A5, PAINTED_H_A5 = PAINTED_W_A4 * (210/297), PAINTED_H_A4 * (148/210)
 
-optimal_shapes = {} # 計算結果を保存しておく辞書
+# A4基準からの縮小・拡大スケールを計算（長辺297mm基準）
+SCALE_A3 = 420 / 297
+SCALE_B5 = 257 / 297
+SCALE_A5 = 210 / 297
+
+PAINTED_W_A3, PAINTED_H_A3 = PAINTED_W_A4 * SCALE_A3, PAINTED_H_A4 * SCALE_A3
+PAINTED_W_B5, PAINTED_H_B5 = PAINTED_W_A4 * SCALE_B5, PAINTED_H_A4 * SCALE_B5
+PAINTED_W_A5, PAINTED_H_A5 = PAINTED_W_A4 * SCALE_A5, PAINTED_H_A4 * SCALE_A5
+
+def format_size_calc(paper_name, w_m, h_m, sheets_w, sheets_h):
+    # 1枚あたりの寸法(cm) × 枚数 = 合計(m) の文字列を生成
+    w_cm = w_m * 100
+    h_cm = h_m * 100
+    total_w = w_m * sheets_w
+    total_h = h_m * sheets_h
+    return f"[{paper_name}] 縦: {h_cm:.1f}cm × {sheets_h}枚 = **約 {total_h:.2f}m** / 横: {w_cm:.1f}cm × {sheets_w}枚 = **約 {total_w:.2f}m**"
+
+optimal_shapes = {} 
 cols = st.columns(2)
 
 for i, (name, ratio) in enumerate(ratios.items()):
@@ -125,16 +140,15 @@ for i, (name, ratio) in enumerate(ratios.items()):
                         best_h = h
             
     total = best_w * best_h
-    optimal_shapes[name] = (best_h, best_w) # プルダウン用に結果を保存
+    optimal_shapes[name] = (best_h, best_w)
 
-    h_A4, w_A4 = best_h * PAINTED_H_A4, best_w * PAINTED_W_A4
-    h_A3, w_A3 = best_h * PAINTED_H_A3, best_w * PAINTED_W_A3
-    h_B5, w_B5 = best_h * PAINTED_H_B5, best_w * PAINTED_W_B5
-    h_A5, w_A5 = best_h * PAINTED_H_A5, best_w * PAINTED_W_A5
-    
     with cols[i % 2]:
         st.markdown(f"**▼ {name}** ⇒ 【縦 **{best_h}** 枚 × 横 **{best_w}** 枚】 (計 {total} 枚 / 予備 +{total - target_area}枚)")
-        st.caption(f"[A3] 縦 約 {h_A3:.1f}m×横 約 {w_A3:.1f}m / [A4] 縦 約 {h_A4:.1f}m×横 約 {w_A4:.1f}m<br>[B5] 縦 約 {h_B5:.1f}m×横 約 {w_B5:.1f}m / [A5] 縦 約 {h_A5:.1f}m×横 約 {w_A5:.1f}m", unsafe_allow_html=True)
+        st.caption(f"{format_size_calc('A3', PAINTED_W_A3, PAINTED_H_A3, best_w, best_h)}<br>"
+                   f"{format_size_calc('A4', PAINTED_W_A4, PAINTED_H_A4, best_w, best_h)}<br>"
+                   f"{format_size_calc('B5', PAINTED_W_B5, PAINTED_H_B5, best_w, best_h)}<br>"
+                   f"{format_size_calc('A5', PAINTED_W_A5, PAINTED_H_A5, best_w, best_h)}", 
+                   unsafe_allow_html=True)
 
 st.markdown("---")
 
@@ -144,11 +158,9 @@ st.markdown("---")
 st.subheader("🖼️ ステップ2：最大の枠の決定と画像の選択")
 st.write("作りたい画像の形（アスペクト比）を選ぶと、**ステップ1で計算された最適な枚数が自動入力されます**。（数字を直接書き換えて微調整することも可能です）")
 
-# 自動入力用のプルダウン
-preset_choice = st.selectbox("📐 アスペクト比の自動入力", list(optimal_shapes.keys()), index=2) # 初期値は4:3
+preset_choice = st.selectbox("📐 アスペクト比の自動入力", list(optimal_shapes.keys()), index=2)
 auto_h, auto_w = optimal_shapes[preset_choice]
 
-# 入力欄（プルダウンの値が自動セットされる）
 col1, col2 = st.columns(2)
 with col1:
     max_sheets_h = st.number_input("縦の枚数", min_value=1, max_value=200, value=auto_h)
@@ -169,7 +181,6 @@ if uploaded_file is not None:
         max_pixels_w = max_sheets_w * CELLS_W
         max_pixels_h = max_sheets_h * CELLS_H
         
-        # 枠の物理サイズ（色塗り部分のみ）を基準に比率計算
         frame_physical_w = max_sheets_w * PAINTED_W_A4
         frame_physical_h = max_sheets_h * PAINTED_H_A4
         frame_physical_aspect = frame_physical_h / frame_physical_w
@@ -197,6 +208,8 @@ if uploaded_file is not None:
         base_img.paste(img_resized, (0, 0))
 
         total_sheets = actual_sheets_w * actual_sheets_h
+        
+        # 最終結果用の寸法計算
         h_A4, w_A4 = actual_sheets_h * PAINTED_H_A4, actual_sheets_w * PAINTED_W_A4
         h_A3, w_A3 = actual_sheets_h * PAINTED_H_A3, actual_sheets_w * PAINTED_W_A3
         h_B5, w_B5 = actual_sheets_h * PAINTED_H_B5, actual_sheets_w * PAINTED_W_B5
@@ -212,10 +225,12 @@ if uploaded_file is not None:
                 st.warning("※元の縦横比を維持するため、枠から不要な用紙を自動で削りました。")
             st.write(f"・総マス目数 : {target_h_pixels * target_w_pixels:,} マス")
             st.write("※以下の物理サイズは、周囲の余白をカットして連結させた際の寸法です。")
-            st.write(f"・[ A3 で印刷 ] : 縦 約 {h_A3:.2f} m × 横 約 {w_A3:.2f} m （特大化）")
-            st.write(f"・[ A4 で印刷 ] : 縦 約 {h_A4:.2f} m × 横 約 {w_A4:.2f} m （基準）")
-            st.write(f"・[ B5 で印刷 ] : 縦 約 {h_B5:.2f} m × 横 約 {w_B5:.2f} m （少し縮小）")
-            st.write(f"・[ A5 で印刷 ] : 縦 約 {h_A5:.2f} m × 横 約 {w_A5:.2f} m （A4用紙に2in1で割付印刷）")
+            
+            # 計算式を明示
+            st.markdown(f"・**[ A3 で印刷 ]** 縦: {PAINTED_H_A3*100:.1f}cm × {actual_sheets_h}枚 = **約 {h_A3:.2f}m** ｜ 横: {PAINTED_W_A3*100:.1f}cm × {actual_sheets_w}枚 = **約 {w_A3:.2f}m**")
+            st.markdown(f"・**[ A4 で印刷 ]** 縦: {PAINTED_H_A4*100:.1f}cm × {actual_sheets_h}枚 = **約 {h_A4:.2f}m** ｜ 横: {PAINTED_W_A4*100:.1f}cm × {actual_sheets_w}枚 = **約 {w_A4:.2f}m**")
+            st.markdown(f"・**[ B5 で印刷 ]** 縦: {PAINTED_H_B5*100:.1f}cm × {actual_sheets_h}枚 = **約 {h_B5:.2f}m** ｜ 横: {PAINTED_W_B5*100:.1f}cm × {actual_sheets_w}枚 = **約 {w_B5:.2f}m**")
+            st.markdown(f"・**[ A5 で印刷 ]** 縦: {PAINTED_H_A5*100:.1f}cm × {actual_sheets_h}枚 = **約 {h_A5:.2f}m** ｜ 横: {PAINTED_W_A5*100:.1f}cm × {actual_sheets_w}枚 = **約 {w_A5:.2f}m**")
             
         pal_img = Image.new("P", (1, 1))
         flat_palette = []

@@ -14,13 +14,13 @@ from reportlab.lib.units import mm
 st.set_page_config(page_title="モザイクアート自動設計システム", layout="wide")
 
 st.title("🎨 モザイクアート自動設計システム")
-st.write("画像をアップロードするだけで、全校生徒で分担して色塗りできるA4サイズの設計図（PDF）を自動生成します。")
+st.write("画像をアップロードするだけで、みんなで分担して色塗りできるA4サイズの設計図（PDF）を自動生成します。")
 
 # ==========================================
 # 1. 基本設定（サイドバー）
 # ==========================================
 st.sidebar.header("⚙️ 基本設定")
-target_area = st.sidebar.number_input("1. 目標とする総枚数（全校生徒数など）", min_value=1, value=100, step=5)
+target_area = st.sidebar.number_input("1. 目標とする総枚数（参加人数など）", min_value=1, value=100, step=10)
 
 cell_options = {
     "パターン1（縦10マス × 横16マス / A4:約1.7cm角, A5:約1.2cm角）": (16, 10),
@@ -74,7 +74,7 @@ SELECTED_PALETTE = palette_options[palette_choice]
 # 2. 事前ガイド（推奨サイズ計算）
 # ==========================================
 st.subheader("💡 ステップ1：代表的な画像比率と最適な用紙枚数")
-st.info(f"目標枚数（{target_area} 枚）を上回りつつ、上限約15%の範囲内で最も形が美しくなる設定を計算しました。\n\n※以下の予想サイズは、**周囲の余白をカットし、色塗り部分のみを連結させた「真の完成サイズ」**です。")
+st.info(f"目標枚数（{target_area} 枚）を上回りつつ、**上限約15%の範囲内で最も形が美しくなる設定**を計算しました。\n\n※以下の予想サイズは、**周囲の余白をカットし、色塗り部分のみを連結させた「真の完成サイズ」**です。")
 
 ratios = {
     "16:9 (動画・スマホ横)": 16/9,
@@ -83,20 +83,17 @@ ratios = {
     " 1:1 (正方形など)": 1/1
 }
 
-# 印刷用紙ごとの「色塗り部分のみ」の物理寸法（単位: メートル）
-# A4: 幅は左右15mmずつカット(-30mm)、高さは上下15mmずつ＋ヘッダー15mmカット(-45mm)
+# 色塗り部分のみの物理寸法
 PAINTED_W_A4 = 0.267
 PAINTED_H_A4 = 0.165
-# 縮小・拡大印刷時の色塗り部分の寸法（A4からの倍率で計算）
 PAINTED_W_A3, PAINTED_H_A3 = PAINTED_W_A4 * (420/297), PAINTED_H_A4 * (297/210)
 PAINTED_W_B5, PAINTED_H_B5 = PAINTED_W_A4 * (257/297), PAINTED_H_A4 * (182/210)
 PAINTED_W_A5, PAINTED_H_A5 = PAINTED_W_A4 * (210/297), PAINTED_H_A4 * (148/210)
 
-default_h, default_w = 20, 28
+optimal_shapes = {} # 計算結果を保存しておく辞書
 cols = st.columns(2)
 
 for i, (name, ratio) in enumerate(ratios.items()):
-    # 画像の比率(ratio)になるように、色塗り部分の寸法ベースで必要な縦横の枚数比を計算
     target_W_to_H = ratio * (PAINTED_H_A4 / PAINTED_W_A4)
     base_h = math.sqrt(target_area / target_W_to_H)
     
@@ -128,8 +125,7 @@ for i, (name, ratio) in enumerate(ratios.items()):
                         best_h = h
             
     total = best_w * best_h
-    if "4:3" in name: 
-        default_h, default_w = best_h, best_w
+    optimal_shapes[name] = (best_h, best_w) # プルダウン用に結果を保存
 
     h_A4, w_A4 = best_h * PAINTED_H_A4, best_w * PAINTED_W_A4
     h_A3, w_A3 = best_h * PAINTED_H_A3, best_w * PAINTED_W_A3
@@ -146,13 +142,18 @@ st.markdown("---")
 # 3. 枠の決定と画像アップロード
 # ==========================================
 st.subheader("🖼️ ステップ2：最大の枠の決定と画像の選択")
-st.write("上のリストを参考に「最大の枠」を入力し、画像をアップロードしてください。（※画像の縦横比を100%維持するため、不要な用紙は自動で削られます）")
+st.write("作りたい画像の形（アスペクト比）を選ぶと、**ステップ1で計算された最適な枚数が自動入力されます**。（数字を直接書き換えて微調整することも可能です）")
 
+# 自動入力用のプルダウン
+preset_choice = st.selectbox("📐 アスペクト比の自動入力", list(optimal_shapes.keys()), index=2) # 初期値は4:3
+auto_h, auto_w = optimal_shapes[preset_choice]
+
+# 入力欄（プルダウンの値が自動セットされる）
 col1, col2 = st.columns(2)
 with col1:
-    max_sheets_h = st.number_input("縦の枚数", min_value=1, max_value=200, value=default_h)
+    max_sheets_h = st.number_input("縦の枚数", min_value=1, max_value=200, value=auto_h)
 with col2:
-    max_sheets_w = st.number_input("横の枚数", min_value=1, max_value=200, value=default_w)
+    max_sheets_w = st.number_input("横の枚数", min_value=1, max_value=200, value=auto_w)
 
 uploaded_file = st.file_uploader("変換する画像ファイルを選択", type=['png', 'jpg', 'jpeg'])
 

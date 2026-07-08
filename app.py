@@ -92,7 +92,7 @@ PAINTED_W_A3, PAINTED_H_A3 = PAINTED_W_A4 * (420/297), PAINTED_H_A4 * (297/210)
 PAINTED_W_B5, PAINTED_H_B5 = PAINTED_W_A4 * (257/297), PAINTED_H_A4 * (182/210)
 PAINTED_W_A5, PAINTED_H_A5 = PAINTED_W_A4 * (210/297), PAINTED_H_A4 * (148/210)
 
-default_h, default_w = 10, 10
+default_h, default_w = 20, 28
 cols = st.columns(2)
 
 for i, (name, ratio) in enumerate(ratios.items()):

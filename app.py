@@ -243,7 +243,7 @@ if uploaded_file is not None:
         preview_img = img_dithered.crop((0, 0, target_w_pixels, target_h_pixels)).convert("RGB")
         
         with res_col2:
-            st.image(preview_img, caption="完成予想プレビュー", use_column_width=True)
+            st.image(preview_img, caption="完成予想プレビュー", use_container_width=True)
 
         font_path = "ipaexg.ttf"
         if not os.path.exists(font_path):
